@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KEKE · GitHub Pages 图床</title>
+<style>
+:root{--p:#7656d6;--p2:#a58ae9;--bg:#f6f4fb;--ink:#29243a;--muted:#777187;--line:#e9e4f1;--red:#d94b65;--green:#25865b}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif}
+header{padding:28px max(20px,calc((100% - 1160px)/2));background:linear-gradient(120deg,#6242c5,#a483e7);color:white}
+h1{margin:0 0 4px;font-size:26px}header p{margin:0;opacity:.9}main{max-width:1160px;margin:24px auto;padding:0 18px}
+.panel{background:white;border:1px solid var(--line);border-radius:16px;padding:20px;margin-bottom:18px;box-shadow:0 7px 24px #38246a0b}
+.head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}h2{font-size:18px;margin:0}
+.row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+input[type=text],input[type=password]{border:1px solid var(--line);border-radius:9px;padding:10px 12px;font:inherit;min-width:0;background:white}
+#token{flex:1;min-width:220px}.repo-input{width:190px}
+button,.pick{border:0;border-radius:9px;padding:10px 14px;background:var(--p);color:white;font:inherit;cursor:pointer}
+button:disabled{opacity:.55;cursor:not-allowed}.secondary{background:#eeeaf7;color:#4e398f}.danger{background:#fff0f2;color:var(--red)}
+.note,.small{font-size:12px;color:var(--muted)}.note{margin:10px 0 0}
+.drop{border:2px dashed #c8b8ed;border-radius:14px;background:#fbfaff;text-align:center;padding:30px 16px;cursor:pointer}
+.drop.drag{background:#f0eaff;border-color:var(--p)}.drop strong{display:block;font-size:17px;margin-bottom:5px}
+.pick{display:inline-block;margin-top:13px}#fileInput{display:none}
+#queue{display:grid;gap:9px;margin-top:14px}.queue-item{padding:10px 12px;border-radius:10px;background:#faf9fd;border:1px solid var(--line)}
+.queue-top{display:flex;justify-content:space-between;gap:10px;font-size:13px}.queue-name{overflow-wrap:anywhere}
+.queue-state{white-space:nowrap;color:var(--muted)}.ok{color:var(--green)}.err{color:var(--red)}
+.progress{height:5px;background:#ece8f4;border-radius:9px;overflow:hidden;margin-top:8px}.progress span{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--p),var(--p2));transition:width .12s}
+#gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px}
+.card{border:1px solid var(--line);border-radius:13px;overflow:hidden;background:white;min-width:0}
+.thumb{height:158px;background:#f2f0f7;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.thumb img{width:100%;height:100%;object-fit:contain}.thumb audio{width:92%}
+.body{padding:12px}.filename{font-weight:600;overflow-wrap:anywhere;margin-bottom:8px}
+.link{width:100%;font-size:12px;padding:8px!important}.actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px}
+.actions button{font-size:12px;padding:7px 9px}.empty{grid-column:1/-1;text-align:center;padding:34px 12px;color:var(--muted)}
+.toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:#292438;color:white;padding:10px 16px;border-radius:10px;z-index:10;display:none;max-width:90vw;box-shadow:0 6px 20px #0002}
+@media(max-width:620px){header{padding:23px 18px}h1{font-size:23px}.panel{padding:15px}.repo-input{width:100%;flex:1}#token{min-width:100%}.head{align-items:flex-start}}
+</style>
+</head>
+<body>
+<header><h1>KEKE · 我的 GitHub 图床</h1><p>图片与音频集中管理 · 多文件上传 · 一键复制外链</p></header>
+<main>
+<section class="panel">
+ <div class="head"><h2>Token 设置</h2></div>
+ <div class="row"><input id="token" type="password" placeholder="粘贴 GitHub Personal Access Token" autocomplete="off"><button id="save">保存 Token</button></div>
+ <div class="row" style="margin-top:10px">
+  <input id="username" class="repo-input" type="text" aria-label="GitHub 用户名">
+  <input id="repo" class="repo-input" type="text" aria-label="仓库名">
+  <input id="branch" class="repo-input" type="text" aria-label="分支">
+ </div>
+ <p class="note">默认仓库：y00324964-ux / keke / main。Token 保存在当前浏览器 localStorage。请勿在公共设备使用，也不要分享含有 Token 的网页。</p>
+</section>
+<section class="panel">
+ <div class="head"><h2>上传文件</h2></div>
+ <div class="drop" id="drop">
+  <strong>点击选择文件，或将文件拖拽到这里</strong>
+  <span class="small">支持多选 · 图片：jpg、png、gif、webp、svg、bmp、ico</span><br>
+  <span class="small">音频：mp3、wav、m4a、ogg、flac、aac</span><br>
+  <label class="pick" for="fileInput">选择文件</label>
+  <input id="fileInput" type="file" multiple accept=".jpg,.jpeg,.png,.gif,.webp,.svg,.bmp,.ico,.mp3,.wav,.m4a,.ogg,.flac,.aac">
+ </div>
+ <div id="queue"></div>
+</section>
+<section class="panel">
+ <div class="head"><h2>我的图库 <span class="small" id="count"></span></h2><button id="refresh" class="secondary">刷新图库</button></div>
+ <div id="gallery"><div class="empty">点击“刷新图库”加载仓库文件</div></div>
+</section>
+</main>
+<div class="toast" id="toast"></div>
+<script>
+// ===== GitHub 仓库信息：需要时修改这三项 =====
+const GITHUB_USERNAME = "y00324964-ux";
+const GITHUB_REPO = "keke";
+const GITHUB_BRANCH = "main";
+// ==============================================
+const $=id=>document.getElementById(id);
+const IMAGE_EXT=/\.(jpe?g|png|gif|webp|svg|bmp|ico)$/i;
+const AUDIO_EXT=/\.(mp3|wav|m4a|ogg|flac|aac)$/i;
+const ALLOWED_EXT=/\.(jpe?g|png|gif|webp|svg|bmp|ico|mp3|wav|m4a|ogg|flac|aac)$/i;
+$("username").value=localStorage.getItem("gh_img_user")||GITHUB_USERNAME;
+$("repo").value=localStorage.getItem("gh_img_repo")||GITHUB_REPO;
+$("branch").value=localStorage.getItem("gh_img_branch")||GITHUB_BRANCH;
+$("token").value=localStorage.getItem("gh_img_token")||"";
+function settings(){return{username:$("username").value.trim(),repo:$("repo").value.trim(),branch:$("branch").value.trim()||"main",token:$("token").value.trim()};}
+function toast(msg){const el=$("toast");el.textContent=msg;el.style.display="block";clearTimeout(toast.timer);toast.timer=setTimeout(()=>el.style.display="none",3000);}
+function ready(){const s=settings();if(!s.username||!s.repo||!s.token){toast("请填写 GitHub 用户名、仓库名和 Token");return false;}return true;}
+function api(path,opts={}){const s=settings();return fetch("https://api.github.com"+path,{...opts,headers:{"Accept":"application/vnd.github+json","Authorization":"Bearer "+s.token,"X-GitHub-Api-Version":"2022-11-28",...(opts.headers||{})}});}
+function encPath(path){return path.split("/").map(encodeURIComponent).join("/");}
+function externalURL(path){const s=settings();return `https://${s.username}.github.io/${s.repo}/${encPath(path)}`;}
+function cleanName(name){return name.normalize("NFKC").replace(/[^\w.\-() ]/g,"_").replace(/\s+/g,"_");}
+function toBase64(file,onProgress){return new Promise((resolve,reject)=>{const r=new FileReader();r.onprogress=e=>{if(e.lengthComputable)onProgress(Math.round(e.loaded/e.total*40));};r.onload=()=>resolve(String(r.result).split(",")[1]);r.onerror=()=>reject(new Error("文件读取失败"));r.readAsDataURL(file);});}
+$("save").onclick=()=>{const s=settings();localStorage.setItem("gh_img_token",s.token);localStorage.setItem("gh_img_user",s.username);localStorage.setItem("gh_img_repo",s.repo);localStorage.setItem("gh_img_branch",s.branch);toast("设置已保存");};
+function queueItem(file){const box=document.createElement("div");box.className="queue-item";const top=document.createElement("div");top.className="queue-top";const name=document.createElement("span");name.className="queue-name";name.textContent=file.name;const status=document.createElement("span");status.className="queue-state";status.textContent="等待上传";top.append(name,status);const bar=document.createElement("div");bar.className="progress";const fill=document.createElement("span");bar.append(fill);box.append(top,bar);$("queue").append(box);return{status,fill};}
+async function uploadOne(file,ui){
+ const s=settings(),filename=`${Date.now()}_${Math.random().toString(36).slice(2,7)}_${cleanName(file.name)}`;
+ const content=await toBase64(file,p=>ui.fill.style.width=p+"%");
+ ui.status.textContent="正在提交到 GitHub…";ui.fill.style.width="45%";
+ const path=`/repos/${encodeURIComponent(s.username)}/${encodeURIComponent(s.repo)}/contents/${encPath(filename)}`;
+ const res=await api(path,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({message:`Upload ${filename}`,content,branch:s.branch})});
+ const data=await res.json().catch(()=>({}));
+ if(!res.ok)throw new Error(data.message||`HTTP ${res.status}`);
+ ui.fill.style.width="100%";return filename;
+}
+async function uploadFiles(fileList){
+ if(!ready())return;const files=Array.from(fileList);if(!files.length)return;
+ $("queue").innerHTML="";let success=0;
+ for(const file of files){
+  const ui=queueItem(file);
+  if(!ALLOWED_EXT.test(file.name)){ui.status.textContent="不支持的文件格式";ui.status.className="queue-state err";continue;}
+  try{ui.status.textContent="准备上传…";await uploadOne(file,ui);ui.status.textContent="上传成功";ui.status.className="queue-state ok";success++;}
+  catch(e){ui.status.textContent="失败："+e.message;ui.status.className="queue-state err";ui.fill.style.background="#d94b65";}
+ }
+ toast(`上传完成：成功 ${success} / ${files.length}`);
+ if(success)await refreshGallery();
+}
+$("fileInput").onchange=e=>{uploadFiles(e.target.files);e.target.value="";};
+$("drop").onclick=e=>{if(e.target.tagName!=="LABEL")$("fileInput").click();};
+$("drop").ondragover=e=>{e.preventDefault();$("drop").classList.add("drag");};
+$("drop").ondragleave=()=> $("drop").classList.remove("drag");
+$("drop").ondrop=e=>{e.preventDefault();$("drop").classList.remove("drag");uploadFiles(e.dataTransfer.files);};
+function button(label,cls,fn){const b=document.createElement("button");b.textContent=label;if(cls)b.className=cls;b.onclick=fn;return b;}
+async function refreshGallery(){
+ if(!ready())return;$("gallery").innerHTML='<div class="empty">正在读取仓库文件…</div>';
+ try{
+  const s=settings(),url=`/repos/${encodeURIComponent(s.username)}/${encodeURIComponent(s.repo)}/git/trees/${encodeURIComponent(s.branch)}?recursive=1`;
+  const res=await api(url),data=await res.json();if(!res.ok)throw new Error(data.message||`HTTP ${res.status}`);
+  const files=(data.tree||[]).filter(x=>x.type==="blob"&&(IMAGE_EXT.test(x.path)||AUDIO_EXT.test(x.path)));
+  renderGallery(files);
+ }catch(e){$("gallery").innerHTML="";const msg=document.createElement("div");msg.className="empty";msg.textContent="读取失败："+e.message;$("gallery").append(msg);toast("刷新图库失败");}
+}
+function renderGallery(files){
+ $("count").textContent=`（${files.length} 个文件）`;const grid=$("gallery");grid.innerHTML="";
+ if(!files.length){grid.innerHTML='<div class="empty">仓库中暂时没有图片或音频</div>';return;}
+ files.forEach(file=>{
+  const card=document.createElement("article");card.className="card";const thumb=document.createElement("div");thumb.className="thumb";const url=externalURL(file.path);
+  if(IMAGE_EXT.test(file.path)){const img=document.createElement("img");img.src=url;img.alt=file.path;img.loading="lazy";thumb.append(img);}
+  else{const audio=document.createElement("audio");audio.controls=true;audio.preload="none";audio.src=url;thumb.append(audio);}
+  const body=document.createElement("div");body.className="body";const name=document.createElement("div");name.className="filename";name.textContent=file.path;
+  const link=document.createElement("input");link.className="link";link.type="text";link.readOnly=true;link.value=url;
+  const actions=document.createElement("div");actions.className="actions";
+  actions.append(button("复制","",()=>{if(navigator.clipboard&&window.isSecureContext)navigator.clipboard.writeText(url).then(()=>toast("链接已复制")).catch(()=>fallbackCopy(link));else fallbackCopy(link);}));
+  actions.append(button("打开","secondary",()=>window.open(url,"_blank","noopener")));
+  actions.append(button("删除","danger",()=>deleteFile(file)));
+  body.append(name,link,actions);card.append(thumb,body);grid.append(card);
+ });
+}
+function fallbackCopy(input){input.select();try{document.execCommand("copy");toast("链接已复制");}catch(e){toast("复制失败，请手动复制链接");}}
+async function deleteFile(file){
+ if(!confirm(`确定删除“${file.path}”吗？此操作无法撤销。`))return;
+ try{
+  const s=settings(),path=`/repos/${encodeURIComponent(s.username)}/${encodeURIComponent(s.repo)}/contents/${encPath(file.path)}`;
+  const res=await api(path,{method:"DELETE",headers:{"Content-Type":"application/json"},body:JSON.stringify({message:`Delete ${file.path}`,sha:file.sha,branch:s.branch})});
+  const data=await res.json().catch(()=>({}));if(!res.ok)throw new Error(data.message||`HTTP ${res.status}`);
+  toast("文件已删除");await refreshGallery();
+ }catch(e){toast("删除失败："+e.message);}
+}
+$("refresh").onclick=refreshGallery;
+</script>
+</body>
+</html>
